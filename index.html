@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZAYKOS | متجر الأرقام</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary-color: #0088cc; --wa-color: #25d366; }
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; padding-bottom: 150px; margin: 0; }
+        
+        .hero-section {
+            background: linear-gradient(135deg, #0088cc 0%, #005580 100%);
+            color: white; padding: 50px 0 80px;
+            border-bottom-left-radius: 50px; border-bottom-right-radius: 50px;
+            margin-bottom: -40px;
+        }
+
+        .product-card {
+            background: white; border: none; border-radius: 20px;
+            transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            height: 100%; display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .product-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); }
+        
+        .platform-badge { padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: bold; }
+        .bg-tele { background: #e1f5fe; color: #0288d1; }
+        .bg-wa { background: #e8f5e9; color: #2e7d32; }
+
+        .price-box { font-size: 1.4rem; font-weight: 800; color: #2ecc71; }
+        .btn-buy { border-radius: 12px; padding: 10px; font-weight: bold; background: var(--primary-color); border: none; color: white; width: 100%; }
+
+        /* سلة المشتريات العائمة */
+        .floating-cart {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 95%; max-width: 500px; background: white;
+            padding: 15px 20px; border-radius: 25px;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+            z-index: 1000; display: none; border: 1px solid #eee;
+        }
+
+        .cart-items-list { max-height: 200px; overflow-y: auto; margin-bottom: 15px; border-bottom: 1px solid #eee; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 0.9rem; }
+        .btn-remove { color: #ff5252; cursor: pointer; font-weight: bold; font-size: 1.2rem; border: none; background: none; }
+    </style>
+</head>
+<body>
+
+<div class="hero-section text-center">
+    <div class="container">
+        <h1 class="fw-bold">💎 متجر ZAYKOS</h1>
+        <p class="lead opacity-75">أرقام واتساب وتليجرام آمنة 100%</p>
+    </div>
+</div>
+
+<div class="container mt-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-center gap-2 mb-3">
+                <button class="btn btn-light rounded-pill px-4" onclick="filterData('all')">الكل</button>
+                <button class="btn btn-light rounded-pill px-4" onclick="filterData('tele')">تليجرام 🔹</button>
+                <button class="btn btn-light rounded-pill px-4" onclick="filterData('wa')">واتساب 🟢</button>
+            </div>
+            <input type="text" id="search" class="form-control form-control-lg rounded-pill shadow-sm border-0" 
+                   placeholder="🔍 ابحث عن دولة معينة..." onkeyup="searchData()">
+        </div>
+    </div>
+
+    <div class="row g-3" id="products-grid">
+        </div>
+</div>
+
+<div id="cart-bar" class="floating-cart">
+    <div class="cart-items-list" id="cart-list">
+        </div>
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <span class="text-muted small">الإجمالي:</span>
+            <span class="fw-bold fs-4 text-success" id="cart-total">0</span> <span class="fw-bold text-success">$</span>
+        </div>
+        <button class="btn btn-success rounded-pill px-4 py-2 fw-bold" onclick="checkout()">
+            إرسال الطلب عبر تليجرام 🚀
+        </button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const SUPABASE_URL = "https://vjwmoejvkauscrkdspis.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_ZuXdVnkD745wHOVlbloWEw__T7VIRn8";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let allProducts = [];
+    let cart = [];
+
+    window.onload = async () => {
+        const { data } = await supabaseClient.from('numbers_store').select('*').order('is_available', { ascending: false });
+        if (data) { allProducts = data; renderProducts(allProducts); }
+    };
+
+    function renderProducts(items) {
+        const grid = document.getElementById('products-grid');
+        grid.innerHTML = "";
+        items.forEach(item => {
+            const finalPrice = item.discount_price || item.price;
+            grid.innerHTML += `
+                <div class="col-6 col-md-4 col-lg-3">
+                    <div class="product-card p-3 ${!item.is_available ? 'opacity-50' : ''}">
+                        <div>
+                            <span class="platform-badge ${item.platform === 'tele' ? 'bg-tele' : 'bg-wa'}">
+                                ${item.platform === 'tele' ? 'تليجرام' : 'واتساب'}
+                            </span>
+                            <h6 class="fw-bold mt-2 mb-1">${item.country}</h6>
+                            <div class="price-box mb-2">${finalPrice}$</div>
+                        </div>
+                        <button class="btn btn-buy ${!item.is_available ? 'disabled' : ''}" 
+                                onclick="addToCart('${item.country}', '${item.platform}', ${finalPrice})">
+                            ${item.is_available ? 'إضافة للسلة' : 'نفذت'}
+                        </button>
+                    </div>
+                </div>`;
+        });
+    }
+
+    function addToCart(country, platform, price) {
+        cart.push({ country, platform, price });
+        updateCartUI();
+    }
+
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        updateCartUI();
+    }
+
+    function updateCartUI() {
+        const cartBar = document.getElementById('cart-bar');
+        const cartList = document.getElementById('cart-list');
+        const cartTotal = document.getElementById('cart-total');
+        
+        if (cart.length === 0) {
+            cartBar.style.display = 'none';
+            return;
+        }
+
+        cartBar.style.display = 'block';
+        cartList.innerHTML = "";
+        let total = 0;
+
+        cart.forEach((item, index) => {
+            total += item.price;
+            cartList.innerHTML += `
+                <div class="cart-item">
+                    <span>${item.country} (${item.platform === 'tele' ? 'تليجرام' : 'واتساب'})</span>
+                    <div>
+                        <span class="fw-bold me-2">${item.price}$</span>
+                        <button class="btn-remove" onclick="removeFromCart(${index})">×</button>
+                    </div>
+                </div>`;
+        });
+        cartTotal.innerText = total.toFixed(2);
+    }
+
+    function filterData(type) {
+        if(type === 'all') renderProducts(allProducts);
+        else renderProducts(allProducts.filter(p => p.platform === type));
+    }
+
+    function searchData() {
+        const query = document.getElementById('search').value.toLowerCase();
+        renderProducts(allProducts.filter(p => p.country.toLowerCase().includes(query)));
+    }
+
+    function checkout() {
+        let text = "أهلاً ZAYKOS، أريد طلب الأرقام التالية:\n\n";
+        cart.forEach(i => text += `• ${i.country} (${i.platform === 'tele' ? 'تليجرام' : 'واتساب'}) - ${i.price}$\n`);
+        text += `\n💰 الإجمالي: ${document.getElementById('cart-total').innerText}$`;
+        window.open(`https://t.me/M_a_r_w_a01?text=${encodeURIComponent(text)}`);
+    }
+</script>
+</body>
+</html>
